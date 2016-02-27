@@ -1,0 +1,92 @@
+contract TestScheduler
+{
+    address owner;
+
+    address scheduler;
+
+    address lastOrigin;
+    address lastSender;
+
+    uint lastCall;
+    uint interval;
+
+    uint FINNEY = 1000000000000000;
+    
+    function TestScheduler()
+    {
+        owner = msg.sender;
+        scheduler = address(0x6c8f2a135f6ed072de4503bd7c4999a1a17f824b);
+    }
+    
+    modifier onlyowner()
+    {
+        if (msg.sender != owner)
+            throw;
+        else
+            _
+    }
+
+    function getLastOrigin() public constant returns(address)
+    {
+        return lastOrigin;
+    }
+
+    function getLastSender() public constant returns(address)
+    {
+        return lastSender;
+    }
+
+    function scheduleSingleCall(uint blocksInTheFuture) public
+    {
+        lastOrigin = tx.origin;
+        lastSender = msg.sender;
+
+        uint targetBlock = block.number + blocksInTheFuture;
+
+        // the 4-byte signature of the local function we want to be called.
+        bytes4 sig = bytes4(sha3("returnFinney()"));
+
+        // the 4-byte signature of the scheduleCall function.
+        bytes4 scheduleCallSig = bytes4(sha3("scheduleCall(bytes4,uint256)"));
+
+        scheduler.call(scheduleCallSig, sig, targetBlock);
+    }
+
+    function scheduleLoopedCall() public
+    {
+        if ((block.number - lastCall) < interval)
+            throw;
+
+        lastOrigin = tx.origin;
+        lastSender = msg.sender;
+
+        lastCall = block.number;
+
+        returnFinney();
+
+        uint targetBlock = block.number + interval;
+
+        // the 4-byte signature of the local function we want to be called.
+        bytes4 sig = bytes4(sha3("scheduleLoopedCall()"));
+
+        // the 4-byte signature of the scheduleCall function.
+        bytes4 scheduleCallSig = bytes4(sha3("scheduleCall(bytes4,uint256)"));
+
+        scheduler.call(scheduleCallSig, sig, targetBlock);
+    }
+
+    function returnFinney() public
+    {
+        owner.send(FINNEY);
+    }
+
+    function empty() onlyowner
+    {
+       owner.send(this.balance);
+    }
+    
+    function kill() onlyowner
+    {
+        suicide(owner);  // kills this contract and sends remaining funds back to creator
+    }
+}
